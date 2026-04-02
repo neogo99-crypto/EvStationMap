@@ -3,91 +3,211 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EV Charging Station Map (MVP)</title>
+    <title>EV Station Aggregator - Chonburi Project</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
     
     <style>
-        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        #header { background: #1a1a2e; color: white; padding: 15px 20px; text-align: center; }
-        /* กำหนดขนาดของแผนที่ให้เต็มหน้าจอ */
-        #map { height: calc(100vh - 60px); width: 100%; }
+        * { box-sizing: border-box; }
+        body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: 'Kanit', sans-serif; 
+            background-color: #f4f7f6;
+        }
         
-        /* ตกแต่งหน้าต่าง Popup */
-        .ev-popup h3 { margin: 0 0 10px 0; color: #0f3460; font-size: 16px; border-bottom: 2px solid #e94560; padding-bottom: 5px;}
-        .ev-popup .provider { font-weight: bold; color: #e94560; margin-bottom: 10px; font-size: 12px; }
-        .connector-item { background: #f1f1f1; padding: 8px; margin-bottom: 5px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;}
-        .type { font-weight: bold; color: #333; }
-        .power { background: #4caf50; color: white; padding: 3px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; }
-        .power.ac { background: #2196f3; }
+        /* Header Style */
+        #header { 
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); 
+            color: white; 
+            padding: 15px 25px; 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            height: 70px;
+        }
+        #header h2 { margin: 0; font-size: 20px; letter-spacing: 1px; }
+        .status-badge {
+            background: #4caf50;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 300;
+        }
+
+        /* Map Container */
+        #map { 
+            height: calc(100vh - 70px); 
+            width: 100%; 
+        }
+
+        /* Custom Popup Styling */
+        .ev-popup { min-width: 200px; padding: 5px; }
+        .ev-popup h3 { 
+            margin: 0 0 8px 0; 
+            color: #1a1a2e; 
+            font-size: 16px; 
+            border-bottom: 2px solid #00d2ff;
+        }
+        .provider-tag {
+            display: inline-block;
+            background: #eee;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #555;
+        }
+        .connector-item {
+            background: #f9f9f9;
+            border-left: 4px solid #00d2ff;
+            padding: 6px 10px;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+        }
+        .power-val { font-weight: bold; color: #2ecc71; }
+
+        /* Loader */
+        #loader {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        .spinner {
+            width: 50px; height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
+    <div id="loader">
+        <div class="spinner"></div>
+        <p>กำลังดึงข้อมูลจาก Database...</p>
+    </div>
+
     <div id="header">
-        <h2>⚡ EV Charging Map Explorer</h2>
+        <h2>⚡ EV STATION EXPLORER <small>(CHONBURI)</small></h2>
+        <div class="status-badge" id="data-count">กำลังโหลดข้อมูล...</div>
     </div>
     
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     
     <script>
-    // 1. กำหนดจุดศูนย์กลางแผนที่ (ซูมออกมาหน่อยให้เห็นภาพกว้างของชลบุรี)
-    const map = L.map('map').setView([13.3100, 100.9500], 10);
+        // --- 1. CONFIGURATION ---
+        // ใส่ลิงก์ CSV ของคุณที่นี่
+        const sheetUrl = "https://docs.google.com/spreadsheets/d/1Mwx45YgaVb6RodezRzDPVTz6VknXBlqpfRxnwG_gRW4/edit?usp=sharing"; 
 
-    // 2. นำเข้าชั้นข้อมูลแผนที่ (ใช้ CartoDB Positron จะดูหรูหราและสะอาดตาสำหรับงานนำเสนอ)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap &copy; CARTO'
-    }).addTo(map);
+        // เริ่มต้นแผนที่ (พิกัดชลบุรี)
+        const map = L.map('map').setView([13.3100, 100.9500], 10);
 
-    // 3. ข้อมูลสถานีชาร์จจำลอง (เพิ่มจำนวนและค่าย)
-    const evStations = [
-        { id: 1, name: "Central Plaza Chonburi", provider: "EA Anywhere", lat: 13.3396, lng: 100.9745, color: "blue", connectors: [{ type: "CCS2 (DC)", power: "150kW" }, { type: "AC Type 2", power: "22kW" }] },
-        { id: 2, name: "PTT Station - Bang Saen", provider: "EV Station PluZ", lat: 13.2875, lng: 100.9150, color: "green", connectors: [{ type: "CCS2 (DC)", power: "120kW" }, { type: "CHAdeMO (DC)", power: "50kW" }] },
-        { id: 3, name: "Robinson Lifestyle Chonburi", provider: "PEA VOLTA", lat: 13.4111, lng: 101.0347, color: "purple", connectors: [{ type: "CCS2 (DC)", power: "100kW" }] },
-        { id: 4, name: "Tesco Lotus Amata Nakorn", provider: "EVolt", lat: 13.4355, lng: 101.0022, color: "orange", connectors: [{ type: "AC Type 2", power: "22kW" }] },
-        { id: 5, name: "Shell Recharge - Bypass Chonburi", provider: "Shell Recharge", lat: 13.3750, lng: 101.0120, color: "red", connectors: [{ type: "CCS2 (DC)", power: "180kW" }] },
-        { id: 6, name: "J-Park Nihon Mura Sriracha", provider: "EA Anywhere", lat: 13.1510, lng: 100.9820, color: "blue", connectors: [{ type: "AC Type 2", power: "7kW" }] },
-        { id: 7, name: "PTT Station - Laem Chabang", provider: "EV Station PluZ", lat: 13.0850, lng: 100.9250, color: "green", connectors: [{ type: "CCS2 (DC)", power: "120kW" }] },
-        { id: 8, name: "Pattaya Terminal 21", provider: "EleX by EGAT", lat: 12.9502, lng: 100.8900, color: "yellow", connectors: [{ type: "CCS2 (DC)", power: "120kW" }, { type: "AC Type 2", power: "22kW" }] },
-        { id: 9, name: "Bangchak Station - Sriracha", provider: "MG Super Charge", lat: 13.1720, lng: 100.9310, color: "darkred", connectors: [{ type: "CCS2 (DC)", power: "50kW" }] },
-        { id: 10, name: "7-Eleven Chonburi Park", provider: "7-EV", lat: 13.3550, lng: 100.9880, color: "darkgreen", connectors: [{ type: "AC Type 2", power: "11kW" }] }
-    ];
+        // ใช้แผนที่สไตล์สะอาดตา (CartoDB Positron)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
 
-    // 4. ฟังก์ชันสร้างไอคอนหมุดตามสี
-    function createIcon(color) {
-        return new L.Icon({
-            iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
-            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41]
-        });
-    }
+        // --- 2. HELPER FUNCTIONS ---
+        // ฟังก์ชันเลือกสีหมุดตามค่ายผู้ให้บริการ
+        function getMarkerColor(provider) {
+            const p = provider.toLowerCase();
+            if (p.includes('ea')) return 'blue';
+            if (p.includes('ptt') || p.includes('pluz')) return 'green';
+            if (p.includes('pea')) return 'violet';
+            if (p.includes('shell')) return 'red';
+            if (p.includes('evolt')) return 'orange';
+            if (p.includes('egat') || p.includes('elex')) return 'yellow';
+            if (p.includes('mg')) return 'red';
+            return 'black'; // ค่าเริ่มต้น
+        }
 
-    // 5. วนลูปสร้างหมุด
-    evStations.forEach(station => {
-        let popupContent = `<div class="ev-popup">
-            <h3>${station.name}</h3>
-            <div class="provider">ผู้ให้บริการ: <b>${station.provider}</b></div>
-            <div style="margin-bottom:5px;"><b>ข้อมูลทางเทคนิค:</b></div>`;
-        
-        station.connectors.forEach(conn => {
-            let powerClass = conn.type.includes('AC') ? 'power ac' : 'power';
-            popupContent += `
-                <div class="connector-item">
-                    <span class="type">${conn.type}</span>
-                    <span class="${powerClass}">${conn.power}</span>
-                </div>`;
-        });
-        popupContent += `</div>`;
+        function createIcon(color) {
+            return new L.Icon({
+                iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
+            });
+        }
 
-        L.marker([station.lat, station.lng], { icon: createIcon(station.color) })
-            .addTo(map)
-            .bindPopup(popupContent);
-    });
-</script>
+        // --- 3. DATA LOADING ---
+        function loadData() {
+            Papa.parse(sheetUrl, {
+                download: true,
+                header: true,
+                complete: function(results) {
+                    const data = results.data;
+                    let count = 0;
+
+                    data.forEach(station => {
+                        // ตรวจสอบว่ามีข้อมูลพิกัดครบถ้วน
+                        if(station.Lat && station.Lng) {
+                            count++;
+                            const color = getMarkerColor(station.Provider || '');
+                            
+                            const popupHTML = `
+                                <div class="ev-popup">
+                                    <h3>${station.Name}</h3>
+                                    <span class="provider-tag">${station.Provider}</span>
+                                    <div class="connector-item">
+                                        <span>หัวชาร์จ:</span>
+                                        <span class="power-val">${station.Connectors}</span>
+                                    </div>
+                                    <div class="connector-item">
+                                        <span>กำลังไฟ:</span>
+                                        <span class="power-val">${station.Power}</span>
+                                    </div>
+                                    <hr>
+                                    <button onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${station.Lat},${station.Lng}')" 
+                                            style="width:100%; cursor:pointer; background:#1a1a2e; color:white; border:none; padding:8px; border-radius:4px;">
+                                        นำทาง (Google Maps)
+                                    </button>
+                                </div>
+                            `;
+
+                            L.marker([parseFloat(station.Lat), parseFloat(station.Lng)], { icon: createIcon(color) })
+                                .addTo(map)
+                                .bindPopup(popupHTML);
+                        }
+                    });
+
+                    // อัปเดต UI
+                    document.getElementById('data-count').innerText = `ออนไลน์: ${count} สถานี`;
+                    document.getElementById('loader').style.display = 'none';
+                },
+                error: function(err) {
+                    alert("ไม่สามารถโหลดข้อมูลได้ โปรดตรวจสอบ Link CSV ใน Google Sheets");
+                    document.getElementById('loader').style.display = 'none';
+                }
+            });
+        }
+
+        // เริ่มทำงาน
+        if(sheetUrl.includes("http")) {
+            loadData();
+        } else {
+            alert("กรุณาใส่ลิงก์ CSV จาก Google Sheets ในโค้ดก่อนครับ!");
+            document.getElementById('loader').style.display = 'none';
+        }
+
+    </script>
 </body>
 </html>
