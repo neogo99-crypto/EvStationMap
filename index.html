@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EV Charging Station Map (MVP)</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #header { background: #1a1a2e; color: white; padding: 15px 20px; text-align: center; }
+        /* กำหนดขนาดของแผนที่ให้เต็มหน้าจอ */
+        #map { height: calc(100vh - 60px); width: 100%; }
+        
+        /* ตกแต่งหน้าต่าง Popup */
+        .ev-popup h3 { margin: 0 0 10px 0; color: #0f3460; font-size: 16px; border-bottom: 2px solid #e94560; padding-bottom: 5px;}
+        .ev-popup .provider { font-weight: bold; color: #e94560; margin-bottom: 10px; font-size: 12px; }
+        .connector-item { background: #f1f1f1; padding: 8px; margin-bottom: 5px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;}
+        .type { font-weight: bold; color: #333; }
+        .power { background: #4caf50; color: white; padding: 3px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+        .power.ac { background: #2196f3; }
+    </style>
+</head>
+<body>
+
+    <div id="header">
+        <h2>⚡ EV Charging Map Explorer</h2>
+    </div>
+    
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // 1. กำหนดจุดศูนย์กลางแผนที่ (พิกัดชลบุรี) และระดับการซูม
+        const map = L.map('map').setView([13.3611, 100.9847], 11);
+
+        // 2. นำเข้าชั้นข้อมูลแผนที่ (ใช้ OpenStreetMap ฟรี)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // 3. จำลองฐานข้อมูลสถานีชาร์จ (Mock Database JSON)
+        const evStations = [
+            {
+                id: 1,
+                name: "Central Plaza Chonburi",
+                provider: "EA Anywhere",
+                lat: 13.3396,
+                lng: 100.9745,
+                connectors: [
+                    { type: "CCS2 (DC)", power: "120kW" },
+                    { type: "AC Type 2", power: "22kW" }
+                ]
+            },
+            {
+                id: 2,
+                name: "PTT Station - Bang Saen",
+                provider: "EV Station PluZ",
+                lat: 13.2875,
+                lng: 100.9150,
+                connectors: [
+                    { type: "CCS2 (DC)", power: "50kW" },
+                    { type: "CHAdeMO (DC)", power: "50kW" }
+                ]
+            },
+            {
+                id: 3,
+                name: "Robinson Lifestyle Chonburi",
+                provider: "PEA VOLTA",
+                lat: 13.4111,
+                lng: 101.0347,
+                connectors: [
+                    { type: "CCS2 (DC)", power: "50kW" },
+                    { type: "AC Type 2", power: "43kW" }
+                ]
+            }
+        ];
+
+        // 4. วนลูปสร้างหมุด (Marker) และสร้าง Popup แสดงข้อมูล
+        evStations.forEach(station => {
+            // สร้าง HTML สำหรับ Popup
+            let popupContent = `<div class="ev-popup">
+                <h3>${station.name}</h3>
+                <div class="provider">ผู้ให้บริการ: ${station.provider}</div>
+                <div><b>หัวชาร์จที่รองรับ:</b></div>`;
+            
+            // วนลูปสร้างรายการหัวชาร์จ
+            station.connectors.forEach(conn => {
+                let powerClass = conn.type.includes('AC') ? 'power ac' : 'power';
+                popupContent += `
+                    <div class="connector-item">
+                        <span class="type">${conn.type}</span>
+                        <span class="${powerClass}">${conn.power}</span>
+                    </div>`;
+            });
+
+            popupContent += `</div>`;
+
+            // ปักหมุดลงบนแผนที่
+            L.marker([station.lat, station.lng])
+                .addTo(map)
+                .bindPopup(popupContent);
+        });
+    </script>
+</body>
+</html>
