@@ -3,153 +3,118 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EV Station Aggregator - Chonburi Project</title>
+    <title>EV Station Aggregator Pro - Chonburi</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
     
     <style>
         * { box-sizing: border-box; }
         body { 
-            margin: 0; 
-            padding: 0; 
+            margin: 0; padding: 0; 
             font-family: 'Kanit', sans-serif; 
-            background-color: #f4f7f6;
+            background-color: #f0f2f5;
         }
         
-        /* Header Style */
+        /* Header & UI */
         #header { 
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); 
-            color: white; 
-            padding: 15px 25px; 
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            height: 70px;
+            background: #1a1a2e; color: white; 
+            padding: 0 20px; height: 60px;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            position: relative; z-index: 1000;
         }
-        #header h2 { margin: 0; font-size: 20px; letter-spacing: 1px; }
-        .status-badge {
-            background: #4caf50;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 300;
-        }
+        #header h2 { margin: 0; font-size: 18px; }
+        .badge { background: #00d2ff; color: #1a1a2e; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; }
 
-        /* Map Container */
-        #map { 
-            height: calc(100vh - 70px); 
-            width: 100%; 
-        }
+        /* Map */
+        #map { height: calc(100vh - 60px); width: 100%; }
 
         /* Custom Popup Styling */
-        .ev-popup { min-width: 200px; padding: 5px; }
-        .ev-popup h3 { 
-            margin: 0 0 8px 0; 
-            color: #1a1a2e; 
-            font-size: 16px; 
-            border-bottom: 2px solid #00d2ff;
+        .ev-popup { min-width: 180px; font-family: 'Kanit', sans-serif; }
+        .ev-popup h3 { margin: 0 0 5px 0; font-size: 16px; color: #1a1a2e; border-bottom: 2px solid #00d2ff; }
+        .provider-label { font-size: 12px; font-weight: bold; color: #666; margin-bottom: 8px; display: block; }
+        .info-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; background: #f8f9fa; padding: 4px; border-radius: 4px; }
+        .btn-nav { 
+            width: 100%; margin-top: 10px; padding: 8px; 
+            background: #1a1a2e; color: white; border: none; 
+            border-radius: 4px; cursor: pointer; font-family: 'Kanit', sans-serif;
         }
-        .provider-tag {
-            display: inline-block;
-            background: #eee;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            margin-bottom: 10px;
-            font-weight: 600;
-            color: #555;
-        }
-        .connector-item {
-            background: #f9f9f9;
-            border-left: 4px solid #00d2ff;
-            padding: 6px 10px;
-            margin-bottom: 6px;
-            display: flex;
-            justify-content: space-between;
-            font-size: 13px;
-        }
-        .power-val { font-weight: bold; color: #2ecc71; }
+        .btn-nav:hover { background: #34495e; }
 
         /* Loader */
         #loader {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255,255,255,0.9);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: white; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 9999;
         }
-        .spinner {
-            width: 50px; height: 50px;
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #3498db;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #00d2ff; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Custom Icon Shadow */
+        .custom-icon { filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5)); transition: transform 0.2s; }
+        .custom-icon:hover { transform: scale(1.2); }
     </style>
 </head>
 <body>
 
     <div id="loader">
         <div class="spinner"></div>
-        <p>กำลังดึงข้อมูลจาก Database...</p>
+        <p style="margin-top:15px">กำลังโหลดฐานข้อมูลสถานีชาร์จ...</p>
     </div>
 
     <div id="header">
-        <h2>⚡ EV STATION EXPLORER <small>(CHONBURI)</small></h2>
-        <div class="status-badge" id="data-count">กำลังโหลดข้อมูล...</div>
+        <h2>⚡ EV STATION AGGREGATOR</h2>
+        <div class="badge" id="counter">สถานี: 0</div>
     </div>
     
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     
     <script>
-        // --- 1. CONFIGURATION ---
-        // ใส่ลิงก์ CSV ของคุณที่นี่
+        // --- 1. SETTINGS ---
+        // ใส่ลิงก์ CSV ของคุณที่นี่ (ต้องเป็นลิงก์ที่ได้จาก Publish to web)
         const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vShqdPryhVInqMcbJf5wuxVIomfL2UGWx4cXWQSFpQ2krWoXrixlM6RdKgmaI2W86_s1wUjkWvjAkA6/pub?output=csv"; 
 
-        // เริ่มต้นแผนที่ (พิกัดชลบุรี)
+        // ตั้งค่าพิกัดเริ่มต้น (ชลบุรี)
         const map = L.map('map').setView([13.3100, 100.9500], 10);
 
-        // ใช้แผนที่สไตล์สะอาดตา (CartoDB Positron)
+        // ใช้แผนที่สไตล์ CartoDB Positron (สะอาดและสบายตา)
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap'
+            attribution: '© OpenStreetMap | Project By Thunderfox'
         }).addTo(map);
 
-        // --- 2. HELPER FUNCTIONS ---
-        // ฟังก์ชันเลือกสีหมุดตามค่ายผู้ให้บริการ
-        function getMarkerColor(provider) {
-            const p = provider.toLowerCase();
-            if (p.includes('ea')) return 'blue';
-            if (p.includes('ptt') || p.includes('pluz')) return 'green';
-            if (p.includes('pea')) return 'violet';
-            if (p.includes('shell')) return 'red';
-            if (p.includes('evolt')) return 'orange';
-            if (p.includes('egat') || p.includes('elex')) return 'yellow';
-            if (p.includes('mg')) return 'red';
-            return 'black'; // ค่าเริ่มต้น
-        }
+        // สร้างกลุ่มสำหรับ Cluster หมุด
+        const markersGroup = L.markerClusterGroup();
 
-        function createIcon(color) {
+        // --- 2. ICON MAPPING ---
+        // ฟังก์ชันเลือกไอคอนตามผู้ให้บริการ
+        function getProviderIcon(provider) {
+            const p = provider ? provider.toLowerCase() : '';
+            let iconUrl = 'https://cdn-icons-png.flaticon.com/512/9355/9355683.png'; // Default
+
+            if (p.includes('ptt') || p.includes('pluz')) iconUrl = 'https://cdn-icons-png.flaticon.com/512/10539/10539918.png';
+            else if (p.includes('ea')) iconUrl = 'https://cdn-icons-png.flaticon.com/512/2991/2991155.png';
+            else if (p.includes('pea')) iconUrl = 'https://cdn-icons-png.flaticon.com/512/355/355980.png';
+            else if (p.includes('shell')) iconUrl = 'https://cdn-icons-png.flaticon.com/512/825/825561.png';
+            else if (p.includes('evolt') || p.includes('elex')) iconUrl = 'https://cdn-icons-png.flaticon.com/512/3104/3104850.png';
+
             return new L.Icon({
-                iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
-                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                iconSize: [25, 41],
-                iconAnchor: [12, 41],
-                popupAnchor: [1, -34],
-                shadowSize: [41, 41]
+                iconUrl: iconUrl,
+                iconSize: [32, 32],
+                iconAnchor: [16, 16],
+                popupAnchor: [0, -12],
+                className: 'custom-icon'
             });
         }
 
-        // --- 3. DATA LOADING ---
-        function loadData() {
+        // --- 3. LOAD DATA FROM GOOGLE SHEETS ---
+        function loadEVData() {
             Papa.parse(sheetUrl, {
                 download: true,
                 header: true,
@@ -158,53 +123,55 @@
                     let count = 0;
 
                     data.forEach(station => {
-                        // ตรวจสอบว่ามีข้อมูลพิกัดครบถ้วน
-                        if(station.Lat && station.Lng) {
+                        if(station.Lat && station.Lng && !isNaN(station.Lat)) {
                             count++;
-                            const color = getMarkerColor(station.Provider || '');
                             
                             const popupHTML = `
                                 <div class="ev-popup">
                                     <h3>${station.Name}</h3>
-                                    <span class="provider-tag">${station.Provider}</span>
-                                    <div class="connector-item">
+                                    <span class="provider-label">ผู้ให้บริการ: ${station.Provider}</span>
+                                    <div class="info-row">
                                         <span>หัวชาร์จ:</span>
-                                        <span class="power-val">${station.Connectors}</span>
+                                        <span style="font-weight:600">${station.Connectors}</span>
                                     </div>
-                                    <div class="connector-item">
+                                    <div class="info-row">
                                         <span>กำลังไฟ:</span>
-                                        <span class="power-val">${station.Power}</span>
+                                        <span style="color:#2ecc71; font-weight:600">${station.Power}</span>
                                     </div>
-                                    <hr>
-                                    <button onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${station.Lat},${station.Lng}')" 
-                                            style="width:100%; cursor:pointer; background:#1a1a2e; color:white; border:none; padding:8px; border-radius:4px;">
-                                        นำทาง (Google Maps)
+                                    <button class="btn-nav" onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${station.Lat},${station.Lng}')">
+                                        📍 นำทางไปยังสถานีนี้
                                     </button>
                                 </div>
                             `;
 
-                            L.marker([parseFloat(station.Lat), parseFloat(station.Lng)], { icon: createIcon(color) })
-                                .addTo(map)
-                                .bindPopup(popupHTML);
+                            const marker = L.marker([parseFloat(station.Lat), parseFloat(station.Lng)], { 
+                                icon: getProviderIcon(station.Provider) 
+                            }).bindPopup(popupHTML);
+
+                            markersGroup.addLayer(marker);
                         }
                     });
 
+                    // นำหมุดทั้งหมดลงแผนที่
+                    map.addLayer(markersGroup);
+                    
                     // อัปเดต UI
-                    document.getElementById('data-count').innerText = `ออนไลน์: ${count} สถานี`;
+                    document.getElementById('counter').innerText = `สถานี: ${count}`;
                     document.getElementById('loader').style.display = 'none';
                 },
                 error: function(err) {
-                    alert("ไม่สามารถโหลดข้อมูลได้ โปรดตรวจสอบ Link CSV ใน Google Sheets");
+                    console.error("Error loading CSV:", err);
+                    alert("ไม่สามารถดึงข้อมูลได้ โปรดตรวจสอบการ Publish CSV");
                     document.getElementById('loader').style.display = 'none';
                 }
             });
         }
 
-        // เริ่มทำงาน
-        if(sheetUrl.includes("http")) {
-            loadData();
+        // เริ่มโหลดข้อมูล
+        if(sheetUrl.startsWith("http")) {
+            loadEVData();
         } else {
-            alert("กรุณาใส่ลิงก์ CSV จาก Google Sheets ในโค้ดก่อนครับ!");
+            alert("กรุณาใส่ลิงก์ CSV จาก Google Sheets ก่อนเริ่มใช้งาน!");
             document.getElementById('loader').style.display = 'none';
         }
 
