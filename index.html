@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EV Smart Map Chonburi - 400 Points</title>
+    <title>EV Station Smart Map - Bangsaen Center</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
@@ -38,7 +38,6 @@
             background: #1a1a2e; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;
         }
 
-        /* Loader */
         #loader {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: white; display: flex; flex-direction: column;
@@ -52,13 +51,13 @@
 
     <div id="loader">
         <div class="spinner"></div>
-        <p style="margin-top:20px; font-weight:bold; color:#1a1a2e;">กำลังดึงสถานะสถานีชาร์จ 400 จุด...</p>
+        <p style="margin-top:20px; font-weight:bold; color:#1a1a2e;">กำลังแสดงสถานีชาร์จรอบบางแสน...</p>
     </div>
 
     <div id="header">
         <div>
             <h2 style="margin:0; font-size:18px;">⚡ EV LIVE MONITORING</h2>
-            <small style="opacity:0.8">จำลองสถานการณ์พิกัดสัตหีบ</small>
+            <small style="opacity:0.8">ตำแหน่งปัจจุบัน: บางแสน (ชลบุรี)</small>
         </div>
         <div style="font-size: 12px; background: rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 5px;">
             <span style="color:#2ecc71">● ว่าง</span> | <span style="color:#e74c3c">● ไม่ว่าง</span>
@@ -72,20 +71,21 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     
     <script>
-        // --- 1. SETTINGS & LINK ---
+        // --- 1. CONFIGURATION ---
         const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vShqdPryhVInqMcbJf5wuxVIomfL2UGWx4cXWQSFpQ2krWoXrixlM6RdKgmaI2W86_s1wUjkWvjAkA6/pub?output=csv"; 
         
-        // ตำแหน่งปัจจุบันของคุณ (สัตหีบ)
-        const myLat = 12.6658;
-        const myLng = 100.9158;
-        const map = L.map('map').setView([myLat, myLng], 11);
+        // พิกัดวงเวียนบางแสน (กึ่งกลางแผนที่)
+        const currentLat = 13.2835;
+        const currentLng = 100.9248;
+        
+        const map = L.map('map').setView([currentLat, currentLng], 12); // Zoom 12 เพื่อให้เห็นระยะกำลังดี
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
             attribution: '© OpenStreetMap'
         }).addTo(map);
 
-        // --- 2. ICONS ---
-        // ไอคอนรูปรถสำหรับตำแหน่งปัจจุบัน (Top-view Car)
+        // --- 2. CUSTOM ICONS ---
+        // ไอคอนรูปรถสำหรับตำแหน่งปัจจุบัน (Blue Car Top View)
         const carIcon = L.icon({
             iconUrl: 'https://www.pngrepo.com/png/112445/512/blue-car.png',
             iconSize: [40, 40],
@@ -93,7 +93,7 @@
             popupAnchor: [0, -15]
         });
 
-        // ฟังก์ชันเลือกหมุดสีแดง/เขียว ตามค่า Status จาก Sheet
+        // ฟังก์ชันเลือกหมุดสีแดง/เขียว
         function getMarkerIcon(status) {
             const color = (status == "1") ? 'red' : 'green';
             return new L.Icon({
@@ -106,13 +106,13 @@
             });
         }
 
-        // เพิ่มหมุดตำแหน่งรถของคุณ
-        L.marker([myLat, myLng], { icon: carIcon }).addTo(map)
-            .bindPopup("<b>📍 รถของคุณ (ตำแหน่งปัจจุบัน)</b><br>พิกัด: " + myLat + ", " + myLng).openPopup();
+        // เพิ่มหมุดรถของคุณที่บางแสน
+        L.marker([currentLat, currentLng], { icon: carIcon }).addTo(map)
+            .bindPopup("<b>📍 คุณอยู่ที่นี่ (บางแสน)</b>").openPopup();
 
         const markersGroup = L.markerClusterGroup();
 
-        // --- 3. DATA LOADING ---
+        // --- 3. DATA PROCESSING ---
         function loadEVData() {
             Papa.parse(sheetUrl, {
                 download: true,
@@ -121,10 +121,8 @@
                     results.data.forEach(station => {
                         if(station.Lat && station.Lng && !isNaN(station.Lat)) {
                             
-                            // อ่านค่าจาก Sheet (0=ว่าง, 1=ไม่ว่าง)
                             const statusValue = station.Status; 
                             const batteryPercent = station.Battery || 0;
-                            
                             const isOccupied = (statusValue == "1");
                             const statusLabel = isOccupied ? "ไม่ว่าง (Occupied)" : "ว่าง (Available)";
                             const dotClass = isOccupied ? "dot-red" : "dot-green";
@@ -143,16 +141,16 @@
                                     </div>
                                     
                                     ${isOccupied ? `
-                                        <div style="font-size:12px; margin-top:12px; display:flex; justify-content:space-between;">
-                                            <span>ความคืบหน้าการชาร์จ:</span>
+                                        <div style="font-size:11px; margin-top:10px; display:flex; justify-content:space-between;">
+                                            <span>กำลังชาร์จ:</span>
                                             <b>${batteryPercent}%</b>
                                         </div>
                                         <div class="battery-container">
                                             <div class="battery-bar" style="width: ${batteryPercent}%"></div>
                                         </div>
-                                    ` : `<p style="color:#2ecc71; font-size:12px; margin:12px 0 0 0;">✓ พร้อมให้บริการทันที</p>`}
+                                    ` : `<p style="color:#2ecc71; font-size:12px; margin:10px 0 0 0;">✓ พร้อมให้บริการ</p>`}
 
-                                    <button class="btn-nav" onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${station.Lat},${station.Lng}')">
+                                    <button class="btn-nav" onclick="window.open('https://www.google.com/maps/dir/?api=1&origin=${currentLat},${currentLng}&destination=${station.Lat},${station.Lng}')">
                                         🚗 เริ่มนำทาง
                                     </button>
                                 </div>
@@ -168,10 +166,6 @@
 
                     map.addLayer(markersGroup);
                     document.getElementById('loader').style.display = 'none';
-                },
-                error: function(err) {
-                    console.error("CSV Load Error:", err);
-                    alert("ไม่สามารถดึงข้อมูลจาก Google Sheets ได้ โปรดตรวจสอบการ Publish");
                 }
             });
         }
