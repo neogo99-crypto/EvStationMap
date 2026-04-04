@@ -3,11 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EV Station Smart Map - Bangsaen Center</title>
+    <title>EV Station Live Map - Bangsaen</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
     
     <style>
@@ -23,18 +21,18 @@
         #map { height: calc(100vh - 65px); width: 100%; }
 
         /* Popup Styles */
-        .ev-popup { min-width: 230px; }
-        .status-header { display: flex; align-items: center; margin-bottom: 10px; font-weight: 600; font-size: 14px; }
+        .ev-popup { min-width: 220px; }
+        .status-header { display: flex; align-items: center; margin-bottom: 8px; font-weight: 600; font-size: 14px; }
         .status-dot { width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; }
         .dot-green { background: #2ecc71; box-shadow: 0 0 8px #2ecc71; }
         .dot-red { background: #e74c3c; box-shadow: 0 0 8px #e74c3c; }
         
-        .battery-container { background: #eee; border-radius: 10px; height: 12px; margin: 10px 0; overflow: hidden; }
+        .battery-container { background: #eee; border-radius: 10px; height: 10px; margin: 8px 0; overflow: hidden; }
         .battery-bar { background: linear-gradient(90deg, #3498db, #2ecc71); height: 100%; transition: width 0.8s; }
         
-        .info-box { background: #f1f3f5; padding: 10px; border-radius: 8px; font-size: 13px; border: 1px solid #dee2e6; }
+        .info-box { background: #f1f3f5; padding: 8px; border-radius: 6px; font-size: 13px; border: 1px solid #dee2e6; line-height: 1.5; }
         .btn-nav { 
-            width: 100%; margin-top: 12px; padding: 10px; 
+            width: 100%; margin-top: 10px; padding: 10px; 
             background: #1a1a2e; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;
         }
 
@@ -43,7 +41,7 @@
             background: white; display: flex; flex-direction: column;
             justify-content: center; align-items: center; z-index: 9999;
         }
-        .spinner { width: 45px; height: 45px; border: 5px solid #f3f3f3; border-top: 5px solid #1a1a2e; border-radius: 50%; animation: spin 1s linear infinite; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #1a1a2e; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
@@ -51,49 +49,47 @@
 
     <div id="loader">
         <div class="spinner"></div>
-        <p style="margin-top:20px; font-weight:bold; color:#1a1a2e;">กำลังแสดงสถานีชาร์จรอบบางแสน...</p>
+        <p style="margin-top:15px; font-weight:bold; color:#1a1a2e;">กำลังโหลดสถานีชาร์จ 400 จุด...</p>
     </div>
 
     <div id="header">
         <div>
-            <h2 style="margin:0; font-size:18px;">⚡ EV LIVE MONITORING</h2>
-            <small style="opacity:0.8">ตำแหน่งปัจจุบัน: บางแสน (ชลบุรี)</small>
+            <h2 style="margin:0; font-size:18px;">⚡ EV LIVE MONITOR</h2>
+            <small style="opacity:0.8">ตำแหน่งปัจจุบัน: บางแสน</small>
         </div>
-        <div style="font-size: 12px; background: rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 5px;">
-            <span style="color:#2ecc71">● ว่าง</span> | <span style="color:#e74c3c">● ไม่ว่าง</span>
+        <div style="font-size: 12px; display: flex; gap: 10px;">
+            <span><b style="color:#2ecc71">●</b> ว่าง</span>
+            <span><b style="color:#e74c3c">●</b> ไม่ว่าง</span>
         </div>
     </div>
     
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     
     <script>
         // --- 1. CONFIGURATION ---
         const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vShqdPryhVInqMcbJf5wuxVIomfL2UGWx4cXWQSFpQ2krWoXrixlM6RdKgmaI2W86_s1wUjkWvjAkA6/pub?output=csv"; 
         
-        // พิกัดวงเวียนบางแสน (กึ่งกลางแผนที่)
-        const currentLat = 13.2835;
-        const currentLng = 100.9248;
+        // พิกัดวงเวียนบางแสน
+        const centerLat = 13.2835;
+        const centerLng = 100.9248;
         
-        const map = L.map('map').setView([currentLat, currentLng], 12); // Zoom 12 เพื่อให้เห็นระยะกำลังดี
+        const map = L.map('map').setView([centerLat, centerLng], 12);
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
             attribution: '© OpenStreetMap'
         }).addTo(map);
 
-        // --- 2. CUSTOM ICONS ---
-        // ไอคอนรูปรถสำหรับตำแหน่งปัจจุบัน (Blue Car Top View)
+        // --- 2. ICONS ---
         const carIcon = L.icon({
-            iconUrl: 'https://www.freeiconspng.com/uploads/vehicle-icon-png-car-sedan-4.png',
+            iconUrl: 'https://www.pngrepo.com/png/112445/512/blue-car.png',
             iconSize: [40, 40],
             iconAnchor: [20, 20],
             popupAnchor: [0, -15]
         });
 
-        // ฟังก์ชันเลือกหมุดสีแดง/เขียว
         function getMarkerIcon(status) {
             const color = (status == "1") ? 'red' : 'green';
             return new L.Icon({
@@ -106,13 +102,11 @@
             });
         }
 
-        // เพิ่มหมุดรถของคุณที่บางแสน
-        L.marker([currentLat, currentLng], { icon: carIcon }).addTo(map)
-            .bindPopup("<b>📍 คุณอยู่ที่นี่ (บางแสน)</b>").openPopup();
+        // เพิ่มหมุดรถที่บางแสน
+        L.marker([centerLat, centerLng], { icon: carIcon }).addTo(map)
+            .bindPopup("<b>📍 ตำแหน่งรถของคุณ</b>").openPopup();
 
-        const markersGroup = L.markerClusterGroup();
-
-        // --- 3. DATA PROCESSING ---
+        // --- 3. DATA LOADING (NO CLUSTER) ---
         function loadEVData() {
             Papa.parse(sheetUrl, {
                 download: true,
@@ -124,7 +118,7 @@
                             const statusValue = station.Status; 
                             const batteryPercent = station.Battery || 0;
                             const isOccupied = (statusValue == "1");
-                            const statusLabel = isOccupied ? "ไม่ว่าง (Occupied)" : "ว่าง (Available)";
+                            const statusLabel = isOccupied ? "ไม่ว่าง" : "ว่าง";
                             const dotClass = isOccupied ? "dot-red" : "dot-green";
 
                             const popupHTML = `
@@ -133,38 +127,36 @@
                                         <div class="status-dot ${dotClass}"></div>
                                         <span style="color:${isOccupied ? '#e74c3c' : '#2ecc71'}">${statusLabel}</span>
                                     </div>
-                                    <h3 style="margin:0 0 5px 0; font-size:16px;">${station.Name}</h3>
+                                    <h3 style="margin:0 0 5px 0; font-size:15px;">${station.Name}</h3>
                                     <div class="info-box">
-                                        <b>แบรนด์:</b> ${station.Provider}<br>
-                                        <b>กำลังไฟ:</b> ${station.Power}<br>
-                                        <b>หัวชาร์จ:</b> ${station.Connectors}
+                                        <b>ค่าย:</b> ${station.Provider}<br>
+                                        <b>หัวชาร์จ:</b> ${station.Connectors}<br>
+                                        <b>กำลังไฟ:</b> ${station.Power}
                                     </div>
                                     
                                     ${isOccupied ? `
-                                        <div style="font-size:11px; margin-top:10px; display:flex; justify-content:space-between;">
-                                            <span>กำลังชาร์จ:</span>
+                                        <div style="font-size:11px; margin-top:8px; display:flex; justify-content:space-between;">
+                                            <span>กำลังชาร์จรถคันอื่น:</span>
                                             <b>${batteryPercent}%</b>
                                         </div>
                                         <div class="battery-container">
                                             <div class="battery-bar" style="width: ${batteryPercent}%"></div>
                                         </div>
-                                    ` : `<p style="color:#2ecc71; font-size:12px; margin:10px 0 0 0;">✓ พร้อมให้บริการ</p>`}
+                                    ` : `<p style="color:#2ecc71; font-size:12px; margin:8px 0 0 0;">✓ พร้อมให้บริการ</p>`}
 
-                                    <button class="btn-nav" onclick="window.open('https://www.google.com/maps/dir/?api=1&origin=${currentLat},${currentLng}&destination=${station.Lat},${station.Lng}')">
+                                    <button class="btn-nav" onclick="window.open('https://www.google.com/maps/dir/?api=1&origin=${centerLat},${centerLng}&destination=${station.Lat},${station.Lng}')">
                                         🚗 เริ่มนำทาง
                                     </button>
                                 </div>
                             `;
 
-                            const marker = L.marker([parseFloat(station.Lat), parseFloat(station.Lng)], { 
+                            // เพิ่มหมุดลงในแผนที่โดยตรง (ไม่ใช้ Cluster)
+                            L.marker([parseFloat(station.Lat), parseFloat(station.Lng)], { 
                                 icon: getMarkerIcon(statusValue) 
-                            }).bindPopup(popupHTML);
-
-                            markersGroup.addLayer(marker);
+                            }).addTo(map).bindPopup(popupHTML);
                         }
                     });
 
-                    map.addLayer(markersGroup);
                     document.getElementById('loader').style.display = 'none';
                 }
             });
