@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EV Station Live Map - Bangsaen</title>
+    <title>EV Route Simulator - Bangsaen</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
     
     <style>
         * { box-sizing: border-box; }
-        body { margin: 0; padding: 0; font-family: 'Kanit', sans-serif; background: #f8f9fa; }
+        body { margin: 0; padding: 0; font-family: 'Kanit', sans-serif; }
         
         #header { 
             background: #1a1a2e; color: white; padding: 0 20px; height: 65px;
@@ -20,149 +21,171 @@
 
         #map { height: calc(100vh - 65px); width: 100%; }
 
-        /* Popup Styles */
-        .ev-popup { min-width: 220px; }
-        .status-header { display: flex; align-items: center; margin-bottom: 8px; font-weight: 600; font-size: 14px; }
-        .status-dot { width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; }
-        .dot-green { background: #2ecc71; box-shadow: 0 0 8px #2ecc71; }
-        .dot-red { background: #e74c3c; box-shadow: 0 0 8px #e74c3c; }
-        
-        .battery-container { background: #eee; border-radius: 10px; height: 10px; margin: 8px 0; overflow: hidden; }
-        .battery-bar { background: linear-gradient(90deg, #3498db, #2ecc71); height: 100%; transition: width 0.8s; }
-        
-        .info-box { background: #f1f3f5; padding: 8px; border-radius: 6px; font-size: 13px; border: 1px solid #dee2e6; line-height: 1.5; }
-        .btn-nav { 
-            width: 100%; margin-top: 10px; padding: 10px; 
-            background: #1a1a2e; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;
+        /* UI Controls */
+        .map-controls {
+            position: absolute; top: 80px; right: 20px; z-index: 1000;
+            display: flex; flex-direction: column; gap: 10px;
         }
+        .btn-control {
+            background: #e74c3c; color: white; border: none; padding: 12px 20px;
+            border-radius: 30px; font-weight: bold; cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: 0.3s;
+        }
+        .btn-control:hover { transform: scale(1.05); background: #c0392b; }
+        .btn-control.active { background: #2ecc71; animation: pulse 1.5s infinite; }
 
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+
+        /* Popup & Info */
+        .ev-popup { min-width: 200px; }
+        .info-box { background: #f8f9fa; padding: 8px; border-radius: 5px; font-size: 13px; margin-top: 5px; border: 1px solid #ddd; }
+        
         #loader {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: white; display: flex; flex-direction: column;
-            justify-content: center; align-items: center; z-index: 9999;
+            position: fixed; inset: 0; background: white; z-index: 9999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
         }
         .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #1a1a2e; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* ซ่อนหน้าต่างรายละเอียดเส้นทางของ Leaflet (เพื่อให้ดูคลีนแบบ App จริง) */
+        .leaflet-routing-container { display: none; }
     </style>
 </head>
 <body>
 
     <div id="loader">
         <div class="spinner"></div>
-        <p style="margin-top:15px; font-weight:bold; color:#1a1a2e;">กำลังโหลดสถานีชาร์จ 400 จุด...</p>
+        <p style="margin-top:15px; font-weight:600;">กำลังเตรียมข้อมูลสถานีชาร์จ...</p>
     </div>
 
     <div id="header">
         <div>
-            <h2 style="margin:0; font-size:18px;">⚡ EV LIVE MONITOR</h2>
-            <small style="opacity:0.8">ตำแหน่งปัจจุบัน: บางแสน</small>
+            <h2 style="margin:0; font-size:18px;">⚡ EV ROUTE PLANNER</h2>
+            <small style="opacity:0.8">จำลองเส้นทางผ่านสถานีชาร์จ</small>
         </div>
         <div style="font-size: 12px; display: flex; gap: 10px;">
-            <span><b style="color:#2ecc71">●</b> ว่าง</span>
+            <span><b style="color:#2ecc71">●</b> ว่าng</span>
             <span><b style="color:#e74c3c">●</b> ไม่ว่าง</span>
         </div>
+    </div>
+
+    <div class="map-controls">
+        <button id="destBtn" class="btn-control" onclick="toggleSelection()">📍 เลือกจุดหมายปลายทาง</button>
     </div>
     
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     
     <script>
-        // --- 1. CONFIGURATION ---
         const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vShqdPryhVInqMcbJf5wuxVIomfL2UGWx4cXWQSFpQ2krWoXrixlM6RdKgmaI2W86_s1wUjkWvjAkA6/pub?output=csv"; 
         
-        // พิกัดวงเวียนบางแสน
-        const centerLat = 13.2835;
-        const centerLng = 100.9248;
-        
-        const map = L.map('map').setView([centerLat, centerLng], 12);
+        // 1. Setup Map (Bangsaen)
+        const startLat = 13.2835;
+        const startLng = 100.9248;
+        const map = L.map('map').setView([startLat, startLng], 13);
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
 
-        // --- 2. ICONS ---
+        // 2. Icons
         const carIcon = L.icon({
-            iconUrl: 'https://cdn-icons-png.freepik.com/512/5193/5193688.png',
-            iconSize: [40, 40],
-            iconAnchor: [20, 20],
-            popupAnchor: [0, -15]
+            iconUrl: 'https://cdn-icons-png.freepik.com/512/5193/5193688.png', // รูปที่คุณเลือก
+            iconSize: [50, 50],
+            iconAnchor: [25, 25]
         });
 
-        function getMarkerIcon(status) {
-            const color = (status == "1") ? 'red' : 'green';
-            return new L.Icon({
-                iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
-                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                iconSize: [25, 41],
-                iconAnchor: [12, 41],
-                popupAnchor: [1, -34],
-                shadowSize: [41, 41]
-            });
+        const destIcon = L.icon({
+            iconUrl: 'https://cdn-icons-png.flaticon.com/512/2776/2776067.png',
+            iconSize: [40, 40],
+            iconAnchor: [20, 40]
+        });
+
+        // รถปัจจุบัน
+        const carMarker = L.marker([startLat, startLng], { icon: carIcon }).addTo(map)
+            .bindPopup("<b>🚗 รถของคุณ (บางแสน)</b>").openPopup();
+
+        // 3. Routing Logic
+        let routingControl = null;
+        let isSelecting = false;
+        let destMarker = null;
+
+        function toggleSelection() {
+            isSelecting = !isSelecting;
+            const btn = document.getElementById('destBtn');
+            if(isSelecting) {
+                btn.innerText = "🖱 คลิกบนแผนที่เพื่อเลือกจุดหมาย";
+                btn.classList.add('active');
+                map.getContainer().style.cursor = 'crosshair';
+            } else {
+                btn.innerText = "📍 เลือกจุดหมายปลายทาง";
+                btn.classList.remove('active');
+                map.getContainer().style.cursor = '';
+            }
         }
 
-        // เพิ่มหมุดรถที่บางแสน
-        L.marker([centerLat, centerLng], { icon: carIcon }).addTo(map)
-            .bindPopup("<b>📍 ตำแหน่งรถของคุณ</b>").openPopup();
+        map.on('click', function(e) {
+            if (!isSelecting) return;
 
-        // --- 3. DATA LOADING (NO CLUSTER) ---
-        function loadEVData() {
+            // ลบเส้นเดิมและหมุดเดิม
+            if (routingControl) map.removeControl(routingControl);
+            if (destMarker) map.removeLayer(destMarker);
+
+            // สร้างหมุดปลายทางใหม่
+            destMarker = L.marker(e.latlng, { icon: destIcon }).addTo(map);
+
+            // ลากเส้นทาง
+            routingControl = L.Routing.control({
+                waypoints: [
+                    L.latLng(startLat, startLng),
+                    L.latLng(e.latlng.lat, e.latlng.lng)
+                ],
+                lineOptions: {
+                    styles: [{ color: '#3498db', weight: 6, opacity: 0.8 }]
+                },
+                createMarker: function() { return null; }, // ไม่ใช้หมุด default ของ routing
+                addWaypoints: false,
+                routeWhileDragging: false
+            }).addTo(map);
+
+            toggleSelection(); // ปิดโหมดเลือก
+        });
+
+        // 4. Load EV Stations (400 Points)
+        function loadEV() {
             Papa.parse(sheetUrl, {
                 download: true,
                 header: true,
                 complete: function(results) {
-                    results.data.forEach(station => {
-                        if(station.Lat && station.Lng && !isNaN(station.Lat)) {
+                    results.data.forEach(st => {
+                        if(st.Lat && st.Lng) {
+                            const isRed = (st.Status == "1");
+                            const markerColor = isRed ? 'red' : 'green';
                             
-                            const statusValue = station.Status; 
-                            const batteryPercent = station.Battery || 0;
-                            const isOccupied = (statusValue == "1");
-                            const statusLabel = isOccupied ? "ไม่ว่าง" : "ว่าง";
-                            const dotClass = isOccupied ? "dot-red" : "dot-green";
-
-                            const popupHTML = `
+                            L.marker([parseFloat(st.Lat), parseFloat(st.Lng)], {
+                                icon: L.icon({
+                                    iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${markerColor}.png`,
+                                    iconSize: [20, 32], iconAnchor: [10, 32], popupAnchor: [1, -25]
+                                })
+                            }).addTo(map).bindPopup(`
                                 <div class="ev-popup">
-                                    <div class="status-header">
-                                        <div class="status-dot ${dotClass}"></div>
-                                        <span style="color:${isOccupied ? '#e74c3c' : '#2ecc71'}">${statusLabel}</span>
-                                    </div>
-                                    <h3 style="margin:0 0 5px 0; font-size:15px;">${station.Name}</h3>
+                                    <b style="color:${isRed?'#e74c3c':'#2ecc71'}">${isRed?'🔴 ไม่ว่าง':'🟢 ว่าง'}</b><br>
+                                    <strong>${st.Name}</strong>
                                     <div class="info-box">
-                                        <b>ค่าย:</b> ${station.Provider}<br>
-                                        <b>หัวชาร์จ:</b> ${station.Connectors}<br>
-                                        <b>กำลังไฟ:</b> ${station.Power}
+                                        ค่าย: ${st.Provider}<br>
+                                        กำลังไฟ: ${st.Power}
                                     </div>
-                                    
-                                    ${isOccupied ? `
-                                        <div style="font-size:11px; margin-top:8px; display:flex; justify-content:space-between;">
-                                            <span>กำลังชาร์จรถคันอื่น:</span>
-                                            <b>${batteryPercent}%</b>
-                                        </div>
-                                        <div class="battery-container">
-                                            <div class="battery-bar" style="width: ${batteryPercent}%"></div>
-                                        </div>
-                                    ` : `<p style="color:#2ecc71; font-size:12px; margin:8px 0 0 0;">✓ พร้อมให้บริการ</p>`}
-
-                                    <button class="btn-nav" onclick="window.open('https://www.google.com/maps/dir/?api=1&origin=${centerLat},${centerLng}&destination=${station.Lat},${station.Lng}')">
-                                        🚗 เริ่มนำทาง
-                                    </button>
                                 </div>
-                            `;
-
-                            // เพิ่มหมุดลงในแผนที่โดยตรง (ไม่ใช้ Cluster)
-                            L.marker([parseFloat(station.Lat), parseFloat(station.Lng)], { 
-                                icon: getMarkerIcon(statusValue) 
-                            }).addTo(map).bindPopup(popupHTML);
+                            `);
                         }
                     });
-
                     document.getElementById('loader').style.display = 'none';
                 }
             });
         }
 
-        loadEVData();
+        loadEV();
     </script>
 </body>
 </html>
