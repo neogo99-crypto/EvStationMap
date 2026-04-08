@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EV Route Monitor - Navigation Edition</title>
+    <title>EV Route Monitor - Final Touch</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
@@ -11,7 +11,7 @@
     
     <style>
         * { box-sizing: border-box; }
-        body { margin: 0; padding: 0; font-family: 'Kanit', sans-serif; overflow: hidden; background: #f4f7f6; }
+        body { margin: 0; padding: 0; font-family: 'Kanit', sans-serif; overflow: hidden; background: #f8fafc; }
         
         #header { 
             background: #1a1a2e; color: white; padding: 0 20px; height: 65px;
@@ -21,47 +21,56 @@
 
         #map { height: calc(100vh - 65px); width: 100%; }
 
+        /* Floating Controls */
         .controls { position: absolute; top: 80px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
         .btn { padding: 12px 25px; border-radius: 30px; border: none; color: white; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); transition: 0.3s; font-family: 'Kanit'; }
         
         .btn-dest { background: #e74c3c; }
         .btn-list { background: #3498db; display: none; } 
-        .btn-clear { background: #555; display: none; }
-        .btn:hover { transform: scale(1.05); }
+        .btn-clear { background: #64748b; display: none; }
+        .btn:hover { transform: translateY(-2px); filter: brightness(1.1); }
 
-        /* Popup Styling - เพิ่มปุ่ม Google Maps */
-        .ev-popup { min-width: 230px; padding: 5px; }
-        .status-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; margin-bottom: 8px; color: white; font-weight: 600; }
-        .bg-red { background: #e74c3c; }
-        .bg-green { background: #2ecc71; }
+        /* Popup Detail */
+        .ev-popup { min-width: 240px; padding: 5px; }
+        .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; margin-bottom: 8px; color: white; font-weight: 600; letter-spacing: 0.5px; }
+        .bg-red { background: #ef4444; }
+        .bg-green { background: #22c55e; }
         
-        .info-box { background: #f8f9fa; padding: 12px; border-radius: 8px; font-size: 13px; border: 1px solid #eee; line-height: 1.6; }
+        .info-box { background: #f1f5f9; padding: 12px; border-radius: 10px; font-size: 13px; border: 1px solid #e2e8f0; line-height: 1.6; color: #334155; }
         
-        /* ปุ่ม Google Maps ใน Popup */
+        /* ปรับปรุงปุ่ม Google Maps ให้อ่านง่ายขึ้น */
         .btn-gmaps { 
-            display: block; width: 100%; text-align: center; background: #4285F4; 
-            color: white; text-decoration: none; padding: 10px; border-radius: 8px; 
-            margin-top: 10px; font-size: 13px; font-weight: 600; transition: 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            width: 100%; background: #4b89dc; color: white; text-decoration: none; 
+            padding: 12px; border-radius: 10px; margin-top: 12px; 
+            font-size: 14px; font-weight: 600; transition: 0.2s;
         }
-        .btn-gmaps:hover { background: #357ae8; }
+        .btn-gmaps:hover { background: #357ae8; box-shadow: 0 4px 12px rgba(75, 137, 220, 0.3); }
 
-        .battery-bg { background: #e9ecef; border-radius: 10px; height: 10px; margin: 10px 0; overflow: hidden; border: 1px solid #dee2e6; }
-        .battery-fill { background: linear-gradient(90deg, #3498db, #2ecc71); height: 100%; transition: width 1s; }
+        .battery-bg { background: #e2e8f0; border-radius: 10px; height: 10px; margin: 10px 0 5px 0; overflow: hidden; }
+        .battery-fill { background: linear-gradient(90deg, #3b82f6, #10b981); height: 100%; transition: width 1s; }
         
+        /* List Station Window */
         #stationPopup {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 90%; max-width: 420px; max-height: 75vh; background: white;
-            z-index: 2000; border-radius: 15px; display: none; flex-direction: column; overflow: hidden;
-            box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+            width: 90%; max-width: 440px; max-height: 75vh; background: white;
+            z-index: 2000; border-radius: 20px; display: none; flex-direction: column; overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
         }
-        .popup-header { background: #1a1a2e; color: white; padding: 18px; display: flex; justify-content: space-between; align-items: center; }
-        .popup-body { overflow-y: auto; padding: 12px; background: #f1f3f5; }
+        .popup-header { background: #1a1a2e; color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .popup-body { overflow-y: auto; padding: 15px; background: #f8fafc; }
+        
+        /* คืนค่าสถานะสีในหน้า List */
         .station-item { 
             display: flex; justify-content: space-between; align-items: center; 
-            padding: 15px; border-bottom: 1px solid #eee; cursor: pointer;
-            background: white; border-radius: 10px; margin-bottom: 10px; transition: 0.2s;
+            padding: 16px; border-bottom: 1px solid #f1f5f9; cursor: pointer;
+            background: white; border-radius: 12px; margin-bottom: 10px; transition: 0.2s;
+            border: 1px solid transparent;
         }
-        #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1999; display: none; }
+        .station-item:hover { border-color: #3498db; background: #f0f9ff; transform: scale(1.01); }
+        .status-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 10px; flex-shrink: 0; }
+        
+        #overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7); z-index: 1999; display: none; backdrop-filter: blur(2px); }
         
         .leaflet-routing-container { display: none; }
     </style>
@@ -69,9 +78,9 @@
 <body>
 
     <div id="header">
-        <div><h2 style="margin:0; font-size:18px;">⚡ EV ROUTE MONITOR</h2></div>
-        <div style="font-size: 12px; background: rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 6px;">
-            <span style="color:#2ecc71">● ว่าง</span> | <span style="color:#e74c3c">● ไม่ว่าง</span>
+        <div><h2 style="margin:0; font-size:18px; letter-spacing: 1px;">⚡ EV ROUTE MONITOR</h2></div>
+        <div style="font-size: 12px; font-weight: 400; opacity: 0.9;">
+            <span style="color:#22c55e">● ว่าง</span> | <span style="color:#ef4444">● ไม่ว่าง</span>
         </div>
     </div>
 
@@ -84,8 +93,8 @@
     <div id="overlay" onclick="closeStationList()"></div>
     <div id="stationPopup">
         <div class="popup-header">
-            <h3 style="margin:0; font-size:16px;">สถานีบนเส้นทาง (เรียงตามระยะทาง)</h3>
-            <span style="cursor:pointer; font-size:20px;" onclick="closeStationList()">×</span>
+            <h3 style="margin:0; font-size:16px;">สถานีตามเส้นทาง (เรียงตามระยะ)</h3>
+            <span style="cursor:pointer; font-size:24px;" onclick="closeStationList()">×</span>
         </div>
         <div id="stationListContainer" class="popup-body"></div>
     </div>
@@ -134,15 +143,14 @@
                                 })
                             }).addTo(map);
 
-                            // --- คืนค่าข้อมูลครบถ้วน + เพิ่มปุ่ม Google Maps ---
                             const gmapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
                             
                             const popupHTML = `
                                 <div class="ev-popup">
                                     <div class="status-badge ${isOccupied ? 'bg-red' : 'bg-green'}">
-                                        ${isOccupied ? '● ไม่ว่าง' : '● ว่าง'}
+                                        ${isOccupied ? '● ไม่ว่าง (Occupied)' : '● ว่าง (Available)'}
                                     </div>
-                                    <h3 style="margin:0 0 8px 0; font-size:16px;">${st.Name}</h3>
+                                    <h3 style="margin:0 0 8px 0; font-size:16px; color:#1e293b;">${st.Name}</h3>
                                     <div class="info-box">
                                         <b>แบรนด์:</b> ${st.Provider}<br>
                                         <b>กำลังไฟ:</b> ${st.Power || 'N/A'}<br>
@@ -150,9 +158,9 @@
                                     </div>
                                     ${isOccupied ? `
                                         <div class="battery-bg"><div class="battery-fill" style="width:${batteryVal}%"></div></div>
-                                        <small>แบตเตอรี่รถคันก่อนหน้า: ${batteryVal}%</small>
+                                        <small style="color:#64748b;">ระดับการชาร์จ: ${batteryVal}%</small>
                                     ` : ''}
-                                    <a href="${gmapsUrl}" target="_blank" class="btn-gmaps">🗺️ นำทางด้วย Google Maps</a>
+                                    <a href="${gmapsUrl}" target="_blank" class="btn-gmaps">📍 นำทางด้วย Google Maps</a>
                                 </div>`;
                             
                             marker.bindPopup(popupHTML);
@@ -166,19 +174,18 @@
 
         function toggleSelection() {
             isSelecting = !isSelecting;
-            document.getElementById('destBtn').innerText = isSelecting ? "🖱 คลิกเลือกที่หมาย" : "📍 เลือกจุดหมายปลายทาง";
+            document.getElementById('destBtn').innerText = isSelecting ? "🖱 คลิกเลือกที่หมายบนแผนที่" : "📍 เลือกจุดหมายปลายทาง";
             map.getContainer().style.cursor = isSelecting ? 'crosshair' : '';
         }
 
         map.on('click', function(e) {
             if (!isSelecting) return;
-            if (routingControl) map.removeControl(routingControl);
-            if (destMarker) map.removeLayer(destMarker);
+            clearRoute();
             destMarker = L.marker(e.latlng).addTo(map);
             routingControl = L.Routing.control({
                 waypoints: [L.latLng(START_POS), L.latLng(e.latlng)],
                 createMarker: () => null,
-                lineOptions: { styles: [{ color: '#3498db', weight: 6 }] },
+                lineOptions: { styles: [{ color: '#3498db', weight: 6, opacity: 0.8 }] },
                 addWaypoints: false
             }).on('routesfound', (ev) => {
                 currentRoutePolyline = L.polyline(ev.routes[0].coordinates);
@@ -209,11 +216,23 @@
                 }
             });
             filtered.sort((a,b) => a.distFromStart - b.distFromStart);
+            
             filtered.forEach(st => {
                 const isOccupied = (st.Status == "1");
                 const item = document.createElement('div');
                 item.className = 'station-item';
-                item.innerHTML = `<div><strong>${st.Provider}</strong><br><small>${st.Name}</small></div><div style="text-align:right"><b>${st.distFromStart.toFixed(1)} กม.</b></div>`;
+                item.innerHTML = `
+                    <div style="display:flex; align-items:center;">
+                        <span class="status-dot" style="background:${isOccupied?'#ef4444':'#22c55e'}"></span>
+                        <div>
+                            <strong>${st.Provider}</strong><br>
+                            <small style="color:#64748b;">${st.Name}</small>
+                        </div>
+                    </div>
+                    <div style="text-align:right">
+                        <b style="color:#3498db;">${st.distFromStart.toFixed(1)} กม.</b><br>
+                        <small style="font-size:10px; color:#94a3b8;">ห่างเส้นทาง ${st.distFromRoute.toFixed(1)} กม.</small>
+                    </div>`;
                 item.onclick = () => { map.flyTo([st.Lat, st.Lng], 15); st.marker.openPopup(); closeStationList(); };
                 container.appendChild(item);
             });
