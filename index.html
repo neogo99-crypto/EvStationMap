@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EV Route Analytics - Station Along Path</title>
+    <title>EV Route Analytics - Pro Sort & Clear</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
@@ -17,10 +17,13 @@
 
         /* Floating Controls */
         .controls { position: absolute; top: 80px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
-        .btn { padding: 12px 25px; border-radius: 30px; border: none; color: white; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); transition: 0.3s; font-family: 'Kanit'; }
+        .btn { padding: 12px 25px; border-radius: 30px; border: none; color: white; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); transition: 0.3s; font-family: 'Kanit'; font-size: 14px; }
+        
         .btn-dest { background: #e74c3c; }
-        .btn-list { background: #3498db; display: none; } /* ซ่อนไว้ก่อนจนกว่าจะลากเส้นเสร็จ */
-        .btn:hover { transform: scale(1.05); }
+        .btn-list { background: #3498db; display: none; } 
+        .btn-clear { background: #555; display: none; }
+        
+        .btn:hover { transform: scale(1.05); opacity: 0.9; }
 
         /* Station List Popup */
         #stationPopup {
@@ -30,18 +33,19 @@
             display: none; flex-direction: column; overflow: hidden;
         }
         .popup-header { background: #1a1a2e; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
-        .popup-body { overflow-y: auto; padding: 10px; }
+        .popup-body { overflow-y: auto; padding: 10px; background: #f8f9fa; }
+        
         .station-item { 
             display: flex; justify-content: space-between; align-items: center; 
-            padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; transition: 0.2s;
+            padding: 15px; border-bottom: 1px solid #eee; cursor: pointer; transition: 0.2s;
+            background: white; border-radius: 10px; margin-bottom: 8px;
         }
-        .station-item:hover { background: #f1f3f5; }
-        .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        .station-item:hover { background: #eef2f7; border-color: #3498db; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; }
 
-        /* Overlay */
         #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1999; display: none; }
-
-        /* Popup Content Map */
+        
+        /* Popup Content Inside Map */
         .battery-bg { background: #eee; border-radius: 10px; height: 8px; margin: 8px 0; overflow: hidden; }
         .battery-fill { background: linear-gradient(90deg, #3498db, #2ecc71); height: 100%; }
         .leaflet-routing-container { display: none; }
@@ -50,23 +54,23 @@
 <body>
 
     <div id="header">
-        <div><h2 style="margin:0; font-size:18px;">⚡ EV ROUTE PRO</h2><small>ระบบค้นหาสถานีตามเส้นทาง</small></div>
+        <div><h2 style="margin:0; font-size:18px;">⚡ EV ROUTE NAVIGATOR</h2><small>วิเคราะห์สถานีตามระยะทางจริง</small></div>
         <div id="routeStatus" style="font-size: 12px; background: rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 5px;">📍 พร้อมกำหนดปลายทาง</div>
     </div>
 
     <div class="controls">
         <button id="destBtn" class="btn btn-dest" onclick="toggleSelection()">📍 เลือกจุดหมายปลายทาง</button>
         <button id="listBtn" class="btn btn-list" onclick="showStationList()">📂 List Station Route</button>
+        <button id="clearBtn" class="btn btn-clear" onclick="clearRoute()">🗑 Clear Route</button>
     </div>
 
     <div id="overlay" onclick="closeStationList()"></div>
     <div id="stationPopup">
         <div class="popup-header">
-            <h3 style="margin:0; font-size:16px;">สถานีบนเส้นทาง (ระยะ < 4 กม.)</h3>
+            <h3 style="margin:0; font-size:16px;">สถานีใกล้เส้นทาง (เรียงตามระยะทาง)</h3>
             <span style="cursor:pointer" onclick="closeStationList()">✖</span>
         </div>
-        <div id="stationListContainer" class="popup-body">
-            </div>
+        <div id="stationListContainer" class="popup-body"></div>
     </div>
 
     <div id="map"></div>
@@ -76,10 +80,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     
     <script>
-        // --- CONSTANTS & CONFIG ---
         const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vShqdPryhVInqMcbJf5wuxVIomfL2UGWx4cXWQSFpQ2krWoXrixlM6RdKgmaI2W86_s1wUjkWvjAkA6/pub?output=csv";
-        const DISTANCE_THRESHOLD = 4; // ระยะห่างจากเส้นทางไม่เกิน 4 กม. (กรรมการกำหนด)
-        const START_POS = [13.2835, 100.9248]; // บางแสน
+        const DISTANCE_THRESHOLD = 4; // กิโลเมตร
+        const START_POS = [13.2835, 100.9248];
 
         const map = L.map('map').setView(START_POS, 13);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
@@ -90,10 +93,10 @@
         let routingControl = null;
         let isSelecting = false;
         let stationsData = [];
-        let stationMarkers = {}; // เก็บ Marker ไว้เปิดภายหลัง
+        let destMarker = null;
         let currentRoutePolyline = null;
 
-        // --- 1. LOAD DATA ---
+        // 1. โหลดข้อมูล
         function loadData() {
             Papa.parse(SHEET_URL, {
                 download: true, header: true,
@@ -108,20 +111,15 @@
                                 })
                             }).addTo(map);
 
-                            // สร้าง Popup เนื้อหาเดิม
                             const popupContent = `
                                 <div>
                                     <b style="color:${isOccupied?'#e74c3c':'#2ecc71'}">${isOccupied?'🔴 ไม่ว่าง':'🟢 ว่าง'}</b><br>
-                                    <strong>${st.Name}</strong><hr>
-                                    <small>ค่าย: ${st.Provider} | ${st.Power}</small>
-                                    ${isOccupied ? `<div class="battery-bg"><div class="battery-fill" style="width:${st.Battery}%"></div></div><small>กำลังชาร์จ: ${st.Battery}%</small>` : ''}
+                                    <strong>${st.Name}</strong><br>
+                                    <small>ค่าย: ${st.Provider}</small>
+                                    ${isOccupied ? `<div class="battery-bg"><div class="battery-fill" style="width:${st.Battery}%"></div></div><small>แบตเตอรี่: ${st.Battery}%</small>` : ''}
                                 </div>`;
-                            
                             marker.bindPopup(popupContent);
-                            
-                            // เก็บข้อมูลไว้ทำ Analytics
                             st.marker = marker;
-                            st.id = index;
                             stationsData.push(st);
                         }
                     });
@@ -129,16 +127,18 @@
             });
         }
 
-        // --- 2. ROUTING LOGIC ---
+        // 2. การจัดการเส้นทาง
         function toggleSelection() {
             isSelecting = !isSelecting;
-            document.getElementById('destBtn').innerText = isSelecting ? "🖱 คลิกเลือกจุดบนแผนที่" : "📍 เลือกจุดหมายปลายทาง";
+            document.getElementById('destBtn').innerText = isSelecting ? "🖱 คลิกเลือกที่หมาย" : "📍 เลือกจุดหมายปลายทาง";
             map.getContainer().style.cursor = isSelecting ? 'crosshair' : '';
         }
 
         map.on('click', function(e) {
             if (!isSelecting) return;
-            if (routingControl) map.removeControl(routingControl);
+            clearRoute(); // ล้างของเก่าก่อนสร้างใหม่
+
+            destMarker = L.marker(e.latlng).addTo(map);
             
             routingControl = L.Routing.control({
                 waypoints: [L.latLng(START_POS[0], START_POS[1]), L.latLng(e.latlng.lat, e.latlng.lng)],
@@ -148,65 +148,84 @@
             }).on('routesfound', function(e) {
                 currentRoutePolyline = L.polyline(e.routes[0].coordinates);
                 document.getElementById('listBtn').style.display = 'block';
-                document.getElementById('routeStatus').innerText = "✅ คำนวณเส้นทางเสร็จสิ้น";
+                document.getElementById('clearBtn').style.display = 'block';
+                document.getElementById('routeStatus').innerText = "✅ เส้นทางพร้อมใช้งาน";
             }).addTo(map);
 
             toggleSelection();
         });
 
-        // --- 3. ANALYTICS: FIND STATIONS ALONG ROUTE ---
+        // 3. ฟังก์ชัน Clear Route
+        function clearRoute() {
+            if (routingControl) map.removeControl(routingControl);
+            if (destMarker) map.removeLayer(destMarker);
+            currentRoutePolyline = null;
+            
+            // ซ่อนปุ่ม
+            document.getElementById('listBtn').style.display = 'none';
+            document.getElementById('clearBtn').style.display = 'none';
+            document.getElementById('routeStatus').innerText = "📍 พร้อมกำหนดปลายทาง";
+        }
+
+        // 4. แสดงรายการสถานี (แบบ Sort ระยะทาง)
         function showStationList() {
             if (!currentRoutePolyline) return;
             
             const container = document.getElementById('stationListContainer');
             container.innerHTML = "";
-            let foundCount = 0;
+            let filteredStations = [];
 
             stationsData.forEach(st => {
                 const stLatLng = L.latLng(st.Lat, st.Lng);
-                // 1. หาระยะห่างจากเส้นทาง (ใช้ฟังก์ชันใกล้เคียงที่สุดบนเส้น)
                 const distFromRoute = getMinDistance(stLatLng, currentRoutePolyline);
-                
-                // 2. หาระยะทางจากจุดเริ่มต้น (ตรงจากรถไปสถานี)
-                const distFromStart = (map.distance(L.latLng(START_POS), stLatLng) / 1000).toFixed(1);
+                const distFromStart = (map.distance(L.latLng(START_POS), stLatLng) / 1000);
 
                 if (distFromRoute <= DISTANCE_THRESHOLD) {
-                    foundCount++;
-                    const isOccupied = (st.Status == "1");
-                    const item = document.createElement('div');
-                    item.className = 'station-item';
-                    item.innerHTML = `
-                        <div>
-                            <span class="status-dot" style="background:${isOccupied?'#e74c3c':'#2ecc71'}"></span>
-                            <strong>${st.Provider}</strong><br>
-                            <small>${st.Name}</small>
-                        </div>
-                        <div style="text-align:right">
-                            <span style="color:#3498db; font-weight:bold;">${distFromStart} km</span><br>
-                            <small style="color:#888">ห่างเส้นทาง ${distFromRoute.toFixed(1)} km</small>
-                        </div>
-                    `;
-                    item.onclick = () => {
-                        map.flyTo(stLatLng, 15);
-                        st.marker.openPopup();
-                        closeStationList();
-                    };
-                    container.appendChild(item);
+                    filteredStations.push({
+                        ...st,
+                        distFromStart: distFromStart,
+                        distFromRoute: distFromRoute
+                    });
                 }
             });
 
-            if(foundCount === 0) container.innerHTML = "<p style='padding:20px; text-align:center;'>ไม่พบสถานีในระยะ 4 กม. รอบเส้นทาง</p>";
+            // --- หัวใจสำคัญ: เรียงลำดับจากน้อยไปมาก (distFromStart) ---
+            filteredStations.sort((a, b) => a.distFromStart - b.distFromStart);
+
+            filteredStations.forEach(st => {
+                const isOccupied = (st.Status == "1");
+                const item = document.createElement('div');
+                item.className = 'station-item';
+                item.innerHTML = `
+                    <div>
+                        <span class="status-dot" style="background:${isOccupied?'#e74c3c':'#2ecc71'}"></span>
+                        <strong>${st.Provider}</strong><br>
+                        <small>${st.Name}</small>
+                    </div>
+                    <div style="text-align:right">
+                        <span style="color:#3498db; font-weight:bold;">${st.distFromStart.toFixed(1)} km</span><br>
+                        <small style="color:#888">ห่างเส้นทาง ${st.distFromRoute.toFixed(1)} km</small>
+                    </div>
+                `;
+                item.onclick = () => {
+                    map.flyTo([st.Lat, st.Lng], 15);
+                    st.marker.openPopup();
+                    closeStationList();
+                };
+                container.appendChild(item);
+            });
+
+            if(filteredStations.length === 0) container.innerHTML = "<p style='padding:20px; text-align:center;'>ไม่พบสถานีในระยะ 4 กม.</p>";
             
             document.getElementById('stationPopup').style.display = 'flex';
             document.getElementById('overlay').style.display = 'block';
         }
 
-        // ฟังก์ชันคำนวณระยะห่างที่สั้นที่สุดจากจุดไปหาเส้น Polyline (หน่วย: กิโลเมตร)
         function getMinDistance(point, polyline) {
-            let minCoords = polyline.getLatLngs();
+            let coords = polyline.getLatLngs();
             let minD = Infinity;
-            for (let i = 0; i < minCoords.length; i++) {
-                let d = map.distance(point, minCoords[i]);
+            for (let i = 0; i < coords.length; i++) {
+                let d = map.distance(point, coords[i]);
                 if (d < minD) minD = d;
             }
             return minD / 1000;
