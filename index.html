@@ -2,91 +2,72 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="mobile-web-app-capable" content="yes">
-    
-    <title>EV Route Pro - Full Screen Demo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EV Route Analytics - Pro Sort & Clear</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
     
     <style>
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        html, body { 
-            margin: 0; padding: 0; font-family: 'Kanit', sans-serif; 
-            width: 100%; height: 100%; overflow: hidden;
-        }
-        
-        #header { 
-            background: #1a1a2e; color: white; padding: 0 15px; 
-            height: 60px; display: flex; justify-content: space-between; 
-            align-items: center; z-index: 1000; position: relative;
-        }
-
-        /* ปรับความสูงแผนที่ให้ยืดหยุ่นตามหน้าจอ (Dynamic Viewport) */
-        #map { height: calc(100dvh - 60px); width: 100%; }
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; font-family: 'Kanit', sans-serif; overflow: hidden; }
+        #header { background: #1a1a2e; color: white; padding: 0 20px; height: 65px; display: flex; justify-content: space-between; align-items: center; z-index: 1000; position: relative; }
+        #map { height: calc(100vh - 65px); width: 100%; }
 
         /* Floating Controls */
-        .controls { 
-            position: absolute; top: 70px; right: 10px; 
-            z-index: 1000; display: flex; flex-direction: column; gap: 8px; 
-        }
+        .controls { position: absolute; top: 80px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
+        .btn { padding: 12px 25px; border-radius: 30px; border: none; color: white; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); transition: 0.3s; font-family: 'Kanit'; font-size: 14px; }
         
-        .btn { 
-            padding: 10px 18px; border-radius: 25px; border: none; 
-            color: white; font-weight: bold; cursor: pointer; 
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2); transition: 0.3s; 
-            font-family: 'Kanit'; font-size: 13px;
-        }
-        
-        .btn-screen { background: #2c3e50; } /* ปุ่มขยายเต็มจอ */
         .btn-dest { background: #e74c3c; }
         .btn-list { background: #3498db; display: none; } 
         .btn-clear { background: #555; display: none; }
         
-        /* Popup & Overlay */
+        .btn:hover { transform: scale(1.05); opacity: 0.9; }
+
+        /* Station List Popup */
         #stationPopup {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 90%; max-width: 400px; max-height: 75vh; background: white;
-            z-index: 2000; border-radius: 15px; display: none; flex-direction: column; overflow: hidden;
+            width: 90%; max-width: 400px; max-height: 70vh; background: white;
+            z-index: 2000; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: none; flex-direction: column; overflow: hidden;
         }
         .popup-header { background: #1a1a2e; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
-        .popup-body { overflow-y: auto; padding: 10px; background: #f1f3f5; }
+        .popup-body { overflow-y: auto; padding: 10px; background: #f8f9fa; }
         
         .station-item { 
             display: flex; justify-content: space-between; align-items: center; 
-            padding: 15px; border-bottom: 1px solid #eee; cursor: pointer;
+            padding: 15px; border-bottom: 1px solid #eee; cursor: pointer; transition: 0.2s;
             background: white; border-radius: 10px; margin-bottom: 8px;
         }
-        .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
-        #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1999; display: none; }
+        .station-item:hover { background: #eef2f7; border-color: #3498db; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+
+        #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1999; display: none; }
         
-        /* Utility */
-        .battery-bg { background: #eee; border-radius: 10px; height: 8px; margin: 5px 0; overflow: hidden; }
+        /* Popup Content Inside Map */
+        .battery-bg { background: #eee; border-radius: 10px; height: 8px; margin: 8px 0; overflow: hidden; }
         .battery-fill { background: linear-gradient(90deg, #3498db, #2ecc71); height: 100%; }
         .leaflet-routing-container { display: none; }
     </style>
 </head>
-<body id="appBody">
+<body>
 
     <div id="header">
-        <div><h2 style="margin:0; font-size:16px;">⚡ EV NAV PRO</h2></div>
-        <button class="btn btn-screen" onclick="toggleFullScreen()">🖥️ Full Screen</button>
+        <div><h2 style="margin:0; font-size:18px;">⚡ EV ROUTE NAVIGATOR</h2><small>วิเคราะห์สถานีตามระยะทางจริง</small></div>
+        <div id="routeStatus" style="font-size: 12px; background: rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 5px;">📍 พร้อมกำหนดปลายทาง</div>
     </div>
 
     <div class="controls">
-        <button id="destBtn" class="btn btn-dest" onclick="toggleSelection()">📍 เลือกจุดหมาย</button>
-        <button id="listBtn" class="btn btn-list" onclick="showStationList()">📂 List Stations</button>
-        <button id="clearBtn" class="btn btn-clear" onclick="clearRoute()">🗑 Clear</button>
+        <button id="destBtn" class="btn btn-dest" onclick="toggleSelection()">📍 เลือกจุดหมายปลายทาง</button>
+        <button id="listBtn" class="btn btn-list" onclick="showStationList()">📂 List Station Route</button>
+        <button id="clearBtn" class="btn btn-clear" onclick="clearRoute()">🗑 Clear Route</button>
     </div>
 
     <div id="overlay" onclick="closeStationList()"></div>
     <div id="stationPopup">
         <div class="popup-header">
-            <h3 style="margin:0; font-size:14px;">สถานีใกล้เคียง (เรียงตามระยะทาง)</h3>
+            <h3 style="margin:0; font-size:16px;">สถานีใกล้เส้นทาง (เรียงตามระยะทาง)</h3>
             <span style="cursor:pointer" onclick="closeStationList()">✖</span>
         </div>
         <div id="stationListContainer" class="popup-body"></div>
@@ -100,15 +81,14 @@
     
     <script>
         const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vShqdPryhVInqMcbJf5wuxVIomfL2UGWx4cXWQSFpQ2krWoXrixlM6RdKgmaI2W86_s1wUjkWvjAkA6/pub?output=csv";
-        const DISTANCE_THRESHOLD = 4;
+        const DISTANCE_THRESHOLD = 4; // กิโลเมตร
         const START_POS = [13.2835, 100.9248];
 
-        const map = L.map('map', { zoomControl: false }).setView(START_POS, 13);
+        const map = L.map('map').setView(START_POS, 13);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
-        L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        const carIcon = L.icon({ iconUrl: 'https://cdn-icons-png.freepik.com/512/3097/3097180.png', iconSize: [40, 40], iconAnchor: [20, 20] });
-        L.marker(START_POS, { icon: carIcon }).addTo(map);
+        const carIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3202/3202926.png', iconSize: [45, 45], iconAnchor: [22, 22] });
+        L.marker(START_POS, { icon: carIcon }).addTo(map).bindPopup("<b>🚗 รถของคุณ</b>");
 
         let routingControl = null;
         let isSelecting = false;
@@ -116,27 +96,12 @@
         let destMarker = null;
         let currentRoutePolyline = null;
 
-        // --- NEW: Full Screen Function ---
-        function toggleFullScreen() {
-            const doc = window.document;
-            const docEl = doc.documentElement;
-
-            const requestFullScreen = docEl.requestFullscreen || docEl.mozRequestFullScreen || docEl.webkitRequestFullScreen || docEl.msRequestFullscreen;
-            const cancelFullScreen = doc.exitFullscreen || doc.mozCancelFullScreen || doc.webkitExitFullscreen || doc.msExitFullscreen;
-
-            if (!doc.fullscreenElement && !doc.mozFullScreenElement && !doc.webkitFullscreenElement && !doc.msFullscreenElement) {
-                requestFullScreen.call(docEl);
-            } else {
-                cancelFullScreen.call(doc);
-            }
-        }
-
-        // --- Original Functions ---
+        // 1. โหลดข้อมูล
         function loadData() {
             Papa.parse(SHEET_URL, {
                 download: true, header: true,
                 complete: function(results) {
-                    results.data.forEach(st => {
+                    results.data.forEach((st, index) => {
                         if(st.Lat && st.Lng) {
                             const isOccupied = (st.Status == "1");
                             const marker = L.marker([parseFloat(st.Lat), parseFloat(st.Lng)], {
@@ -146,8 +111,14 @@
                                 })
                             }).addTo(map);
 
-                            const popupHTML = `<div><b style="color:${isOccupied?'#e74c3c':'#2ecc71'}">${isOccupied?'ไม่ว่าง':'ว่าง'}</b><br><b>${st.Provider}</b><br><small>${st.Name}</small>${isOccupied ? `<div class="battery-bg"><div class="battery-fill" style="width:${st.Battery}%"></div></div>` : ''}</div>`;
-                            marker.bindPopup(popupHTML);
+                            const popupContent = `
+                                <div>
+                                    <b style="color:${isOccupied?'#e74c3c':'#2ecc71'}">${isOccupied?'🔴 ไม่ว่าง':'🟢 ว่าง'}</b><br>
+                                    <strong>${st.Name}</strong><br>
+                                    <small>ค่าย: ${st.Provider}</small>
+                                    ${isOccupied ? `<div class="battery-bg"><div class="battery-fill" style="width:${st.Battery}%"></div></div><small>แบตเตอรี่: ${st.Battery}%</small>` : ''}
+                                </div>`;
+                            marker.bindPopup(popupContent);
                             st.marker = marker;
                             stationsData.push(st);
                         }
@@ -156,71 +127,115 @@
             });
         }
 
+        // 2. การจัดการเส้นทาง
         function toggleSelection() {
             isSelecting = !isSelecting;
-            document.getElementById('destBtn').innerText = isSelecting ? "🖱 คลิกเลือกจุด" : "📍 เลือกจุดหมาย";
-            document.getElementById('destBtn').style.background = isSelecting ? "#2ecc71" : "#e74c3c";
+            document.getElementById('destBtn').innerText = isSelecting ? "🖱 คลิกเลือกที่หมาย" : "📍 เลือกจุดหมายปลายทาง";
             map.getContainer().style.cursor = isSelecting ? 'crosshair' : '';
         }
 
         map.on('click', function(e) {
             if (!isSelecting) return;
-            clearRoute();
+            clearRoute(); // ล้างของเก่าก่อนสร้างใหม่
+
             destMarker = L.marker(e.latlng).addTo(map);
+            
             routingControl = L.Routing.control({
-                waypoints: [L.latLng(START_POS), L.latLng(e.latlng)],
-                createMarker: () => null,
+                waypoints: [L.latLng(START_POS[0], START_POS[1]), L.latLng(e.latlng.lat, e.latlng.lng)],
+                createMarker: function() { return null; },
                 lineOptions: { styles: [{ color: '#3498db', weight: 6 }] },
                 addWaypoints: false
-            }).on('routesfound', (ev) => {
-                currentRoutePolyline = L.polyline(ev.routes[0].coordinates);
+            }).on('routesfound', function(e) {
+                currentRoutePolyline = L.polyline(e.routes[0].coordinates);
                 document.getElementById('listBtn').style.display = 'block';
                 document.getElementById('clearBtn').style.display = 'block';
+                document.getElementById('routeStatus').innerText = "✅ เส้นทางพร้อมใช้งาน";
             }).addTo(map);
+
             toggleSelection();
         });
 
+        // 3. ฟังก์ชัน Clear Route
         function clearRoute() {
             if (routingControl) map.removeControl(routingControl);
             if (destMarker) map.removeLayer(destMarker);
             currentRoutePolyline = null;
+            
+            // ซ่อนปุ่ม
             document.getElementById('listBtn').style.display = 'none';
             document.getElementById('clearBtn').style.display = 'none';
+            document.getElementById('routeStatus').innerText = "📍 พร้อมกำหนดปลายทาง";
         }
 
+        // 4. แสดงรายการสถานี (แบบ Sort ระยะทาง)
         function showStationList() {
             if (!currentRoutePolyline) return;
+            
             const container = document.getElementById('stationListContainer');
             container.innerHTML = "";
-            let filtered = [];
+            let filteredStations = [];
+
             stationsData.forEach(st => {
-                const distFromRoute = getMinDistance(L.latLng(st.Lat, st.Lng), currentRoutePolyline);
-                const distFromStart = map.distance(L.latLng(START_POS), L.latLng(st.Lat, st.Lng)) / 1000;
+                const stLatLng = L.latLng(st.Lat, st.Lng);
+                const distFromRoute = getMinDistance(stLatLng, currentRoutePolyline);
+                const distFromStart = (map.distance(L.latLng(START_POS), stLatLng) / 1000);
+
                 if (distFromRoute <= DISTANCE_THRESHOLD) {
-                    filtered.push({...st, distFromStart, distFromRoute});
+                    filteredStations.push({
+                        ...st,
+                        distFromStart: distFromStart,
+                        distFromRoute: distFromRoute
+                    });
                 }
             });
-            filtered.sort((a,b) => a.distFromStart - b.distFromStart);
-            filtered.forEach(st => {
+
+            // --- หัวใจสำคัญ: เรียงลำดับจากน้อยไปมาก (distFromStart) ---
+            filteredStations.sort((a, b) => a.distFromStart - b.distFromStart);
+
+            filteredStations.forEach(st => {
                 const isOccupied = (st.Status == "1");
                 const item = document.createElement('div');
                 item.className = 'station-item';
-                item.innerHTML = `<div><span class="status-dot" style="background:${isOccupied?'#e74c3c':'#2ecc71'}"></span><strong>${st.Provider}</strong><br><small>${st.Name}</small></div><div style="text-align:right"><b>${st.distFromStart.toFixed(1)} km</b></div>`;
-                item.onclick = () => { map.flyTo([st.Lat, st.Lng], 15); st.marker.openPopup(); closeStationList(); };
+                item.innerHTML = `
+                    <div>
+                        <span class="status-dot" style="background:${isOccupied?'#e74c3c':'#2ecc71'}"></span>
+                        <strong>${st.Provider}</strong><br>
+                        <small>${st.Name}</small>
+                    </div>
+                    <div style="text-align:right">
+                        <span style="color:#3498db; font-weight:bold;">${st.distFromStart.toFixed(1)} km</span><br>
+                        <small style="color:#888">ห่างเส้นทาง ${st.distFromRoute.toFixed(1)} km</small>
+                    </div>
+                `;
+                item.onclick = () => {
+                    map.flyTo([st.Lat, st.Lng], 15);
+                    st.marker.openPopup();
+                    closeStationList();
+                };
                 container.appendChild(item);
             });
+
+            if(filteredStations.length === 0) container.innerHTML = "<p style='padding:20px; text-align:center;'>ไม่พบสถานีในระยะ 4 กม.</p>";
+            
             document.getElementById('stationPopup').style.display = 'flex';
             document.getElementById('overlay').style.display = 'block';
         }
 
         function getMinDistance(point, polyline) {
-            let coords = polyline.getLatLngs(), minD = Infinity;
-            coords.forEach(c => { let d = map.distance(point, c); if (d < minD) minD = d; });
+            let coords = polyline.getLatLngs();
+            let minD = Infinity;
+            for (let i = 0; i < coords.length; i++) {
+                let d = map.distance(point, coords[i]);
+                if (d < minD) minD = d;
+            }
             return minD / 1000;
         }
 
-        function closeStationList() { document.getElementById('stationPopup').style.display = 'none'; document.getElementById('overlay').style.display = 'none'; }
-        
+        function closeStationList() {
+            document.getElementById('stationPopup').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+        }
+
         loadData();
     </script>
 </body>
