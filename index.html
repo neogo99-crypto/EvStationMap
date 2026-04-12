@@ -106,10 +106,8 @@
         const map = L.map('map', { zoomControl: false }).setView(START_POS, 14);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
 
-        const carIcon = L.icon({ iconUrl: 'https://e7.pngegg.com/pngimages/90/651/png-clipart-car-bird-s-eye-view-top-view-convertible-transport.png', iconSize: [32, 32], iconAnchor: [24, 24] });
-        const garageIcon = L.icon({ iconUrl: ''https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgOBCOuanVbZmRQCEzxzdmbIoKdehQkdN1aX4vKSMwHrDyBmK9sH72uY9SOquhfSU0LynByIg9J3XIXCTEWSBhJSmZ0xcQ3B-XZZeDMoO8w5rH2twW4Oh-iyrcDsbiRM0ryPa9EiZiMzwLL7NjrSgDamsGBRZq5_8V_Xc3OBtggEiF8ep7CgZHBCy-7kjg/s259/image%20%282%29.png'', 
-                                   iconSize: [38, 38], 
-                                   iconAnchor: [19, 38], popupAnchor: [0, -34] });
+        const carIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3202/3202926.png', iconSize: [48, 48], iconAnchor: [24, 24] });
+        const garageIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3039/3039487.png', iconSize: [38, 38], iconAnchor: [19, 38], popupAnchor: [0, -34] });
 
         L.marker(START_POS, { icon: carIcon, zIndexOffset: 1000 }).addTo(map).bindPopup("<b>🚗 รถของคุณ</b>");
 
